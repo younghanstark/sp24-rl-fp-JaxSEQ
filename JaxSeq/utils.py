@@ -329,7 +329,7 @@ def jsonl_load(fp: Iterator) -> List[Dict]:
     return list(jsonl_stream(fp))
 
 
-def load_mesh(shape: Tuple[int], axis_names: Tuple[str]) -> Mesh:
+def load_mesh(shape: Tuple[int], axis_names: Tuple[str], num_gpus=None) -> Mesh:
     """load device mesh with data parallel on the first axis and model parallel on the second axis"""
     assert sum(map(lambda x: int(x == -1), shape)) <= 1, "only one of the mesh dimensions can be -1"
     if -1 in shape:
@@ -337,7 +337,12 @@ def load_mesh(shape: Tuple[int], axis_names: Tuple[str]) -> Mesh:
         prod = reduce(lambda a, b: a*b, filter(lambda x: x != -1, shape), 1)
         shape[shape.index(-1)] = int(len(jax.devices()) / prod)
         shape = tuple(shape)
-    devices = mesh_utils.create_device_mesh(shape)
+    
+    jax_devices = jax.devices()
+    if num_gpus is not None:
+        jax_devices = jax_devices[:num_gpus]
+
+    devices = mesh_utils.create_device_mesh(shape, devices=jax_devices)
     return Mesh(devices, axis_names=axis_names)
 
 def float_to_dtype(tree, dtype=jnp.float32):
